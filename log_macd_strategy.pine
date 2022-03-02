@@ -1,0 +1,50 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Telegram: ©Karlpy Twitter: @ctmarauder
+
+//@version=5
+strategy("Log MACD Strategy", overlay=true)
+
+PI=3.14159265359
+
+drop1st(src) =>
+    x = float(na)
+    x := na(src[1]) ? na : src
+
+EhlersSuperSmoother(src, lower) =>
+	a1 = math.exp(-PI * math.sqrt(2) / lower)
+	coeff2 = 2 * a1 * math.cos(math.sqrt(2) * PI / lower)
+	coeff3 = -math.pow(a1, 2)
+	coeff1 = (1 - coeff2 - coeff3) / 2
+	filt = float(na)
+	filt := nz(coeff1 * (src + nz(src[1], src)) + coeff2 * filt[1] + coeff3 * nz(filt[2], filt[1]), src)
+
+// Replaces built-in EMA function for better sensitivity in the beginning
+xema(src, len) =>
+    mult = 2.0 / (len + 1.0)
+    res = float(na)
+    res := nz(mult * src + (1.0 - mult) * res[1], src)
+
+// Reduce range of the output
+LogClip(xs) =>
+    xs > 0 ? math.log(1.0 + xs) : -math.log(1.0 - xs)
+
+fastLength = input.int(7, minval=1, title="Fast Length")
+slowLength = input.int(290, minval=1, title="Slow Length")
+maLength = input.int(7, minval=1, title="MA Length")
+signalSmoothing = input.int(3, minval=0, title="Signal Smoothing")
+showsignals = input(false, title="Buy/Sell Signals")
+logcompress = input(false, title="Extra Log Compression")
+src = input.source(title="Source", defval=close)
+
+price = math.log(drop1st(src))
+fastMA = xema(price, fastLength)
+slowMA = xema(price, slowLength)
+rawsig = EhlersSuperSmoother(fastMA - slowMA, signalSmoothing)
+sig = logcompress ? LogClip(rawsig) : rawsig
+ma = ta.sma(sig, maLength)
+delta = sig - ma
+
+if (ta.crossover(delta, 0))
+	strategy.entry("Buy", strategy.long, comment="Buy")
+if (ta.crossunder(delta, 0))
+	strategy.entry("Sell", strategy.short, comment="Sell")
