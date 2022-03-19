@@ -28,13 +28,14 @@ xema(src, len) =>
 LogClip(xs) =>
     xs > 0 ? math.log(1.0 + xs) : -math.log(1.0 - xs)
 
-fastLength = input.int(7, minval=1, title="Fast Length")
-slowLength = input.int(290, minval=1, title="Slow Length")
-maLength = input.int(7, minval=1, title="MA Length")
-signalSmoothing = input.int(3, minval=0, title="Signal Smoothing")
-showsignals = input(false, title="Buy/Sell Signals")
+fastLength = input.int(3, minval=1, title="Fast Length")
+slowLength = input.int(57, minval=1, title="Slow Length")
+maLength = input.int(155, minval=1, title="MA Length")
+signalSmoothing = input.int(5, minval=0, title="Signal Smoothing")
 logcompress = input(false, title="Extra Log Compression")
 src = input.source(title="Source", defval=close)
+long_threshold = input.float(-0.03, title="Long Threshold", step=0.01)
+short_threshold = input.float(0.1, title="Short Threshold", step=0.01)
 
 price = math.log(drop1st(src))
 fastMA = xema(price, fastLength)
@@ -44,7 +45,15 @@ sig = logcompress ? LogClip(rawsig) : rawsig
 ma = ta.sma(sig, maLength)
 delta = sig - ma
 
-if (ta.crossover(delta, 0))
-	strategy.entry("Buy", strategy.long, comment="Buy")
-if (ta.crossunder(delta, 0))
+// Buy/Sell Signals
+// use curvature information to filter out some false positives
+mm1 = ta.change(ta.change(ma, 1), 1)
+mm2 = ta.change(ta.change(ma, 2), 2)
+
+long_condition = (mm1 > 0 and mm2 > 0) and ta.crossover(sig, ma) and sig[1] > long_threshold
+short_condition = (mm1 < 0 and mm2 < 0) and ta.crossunder(sig, ma) and sig[1] < short_threshold
+
+if (long_condition)
+	strategy.entry("Buy", strategy.long, comment="Buy") 
+if (short_condition)
 	strategy.entry("Sell", strategy.short, comment="Sell")
