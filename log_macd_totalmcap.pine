@@ -1,59 +1,61 @@
-//@version=3
-study(title="Smoothed Log-Space MACD [Karl]", shorttitle="Log MACD for TOTAL Mcap", precision=3)
+//@version=5
+indicator(title="Smoothed Log-Space MACD [Karl]", shorttitle="Log MACD for TOTAL Mcap", precision=3)
 
 PI=3.14159265359
 
 drop1st(src) =>
-    x = na
+    x = float(na)
     x := na(src[1]) ? na : src
 
 EhlersSuperSmoother(src, lower) =>
-	a1 = exp(-PI * sqrt(2) / lower)
-	coeff2 = 2 * a1 * cos(sqrt(2) * PI / lower)
-	coeff3 = -pow(a1, 2)
+	a1 = math.exp(-PI * math.sqrt(2) / lower)
+	coeff2 = 2 * a1 * math.cos(math.sqrt(2) * PI / lower)
+	coeff3 = -math.pow(a1, 2)
 	coeff1 = (1 - coeff2 - coeff3) / 2
-	filt = na
+	filt = float(na)
 	filt := nz(coeff1 * (src + nz(src[1], src)) + coeff2 * filt[1] + coeff3 * nz(filt[2], filt[1]), src)
 
 // Replaces built-in EMA function for better sensitivity in the beginning
 xema(src, len) =>
     mult = 2.0 / (len + 1.0)
-    res = na
+    res = float(na)
     res := nz(mult * src + (1.0 - mult) * res[1], src)
 
 // Reduce range of the output
 LogClip(xs) =>
-    xs > 0 ? log(1.0 + xs) : -log(1.0 - xs)
+    xs > 0 ? math.log(1.0 + xs) : -math.log(1.0 - xs)
 
-fastLength = input(7, minval=1, title="Fast Length")
-slowLength = input(290, minval=1, title="Slow Length")
-maLength=input(7, minval=1, title="MA Length")
-signalSmoothing = input(3, minval=0, title="Signal Smoothing")
-showsignals = input(false, title="Buy/Sell Signals", defval=true)
+fastLength = input.int(3, minval=1, title="Fast Length")
+slowLength = input.int(57, minval=1, title="Slow Length")
+maLength = input.int(155, minval=1, title="MA Length")
+signalSmoothing = input.int(5, minval=0, title="Signal Smoothing")
 logcompress = input(false, title="Extra Log Compression")
-src = input(title="Source", type=source, defval=close)
+src = input.source(title="Source", defval=close)
+long_threshold = input.float(-0.03, title="Long Threshold", step=0.01)
+short_threshold = input.float(0.1, title="Short Threshold", step=0.01)
 
-price = log(drop1st(src))
+price = math.log(drop1st(src))
 fastMA = xema(price, fastLength)
 slowMA = xema(price, slowLength)
 rawsig = EhlersSuperSmoother(fastMA - slowMA, signalSmoothing)
 sig = logcompress ? LogClip(rawsig) : rawsig
-ma = sma(sig, maLength)
+ma = ta.sma(sig, maLength)
 delta = sig - ma
 
-plot(sig, color=#0094ff, style=line, title="MACD", transp=0)
-plot(ma, color=#ff6a00, style=line, title="EMA", transp=0)
-plot(delta, color=(delta > 0 ? #4985e7 : orange), style=histogram, title="Histogram")
+plot(sig, color=#FF6D00, title="MACD")
+plot(ma, color=#2962FF, title="EMA")
+plot(delta, style=plot.style_columns, color=(delta > 0 ? #4985e7 : color.orange), title="Histogram", transp=50)
 
 // Buy/Sell Signals
-
 // use curvature information to filter out some false positives
-midpoint = 0.0
-mm1 = change(change(ma, 1), 1)
-mm2 = change(change(ma, 2), 2)
-sellsignals = showsignals and (mm1 < 0 and mm2 < 0) and crossunder(sig, ma) and sig[1] > midpoint
-buysignals = showsignals and (mm1 > 0 and mm2 > 0) and crossover(sig, ma) and sig[1] < midpoint
+mm1 = ta.change(ta.change(ma, 1), 1)
+mm2 = ta.change(ta.change(ma, 2), 2)
+
+buysignal = (mm1 > 0 and mm2 > 0) and ta.crossover(sig, ma) and sig[1] > long_threshold
+sellsignal = (mm1 < 0 and mm2 < 0) and ta.crossunder(sig, ma) and sig[1] < short_threshold
+drawbuysignal = ta.barssince(sellsignal) <= ta.barssince(buysignal[1]) and buysignal
+drawsellsignal = ta.barssince(buysignal) <= ta.barssince(sellsignal[1]) and sellsignal
 
 off = 1.1
-plot(buysignals ? off * sig[1] : na, style=circles, color=#008fff, linewidth=3, title="Buy Signal", transp=0)
-plot(sellsignals ? off * sig[1] : na, style=circles, color=#ff0000, linewidth=3, title="Sell Signal", transp=0)
+plot(drawbuysignal ? off * sig[1] : na,  style=plot.style_circles, color=#008fff, linewidth=3, title="Buy Signal", transp=0)
+plot(drawsellsignal ? off * sig[1] : na,  style=plot.style_circles, color=#ff0000, linewidth=3, title="Sell Signal", transp=0)
