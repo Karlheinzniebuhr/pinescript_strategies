@@ -1,5 +1,5 @@
 //@version=5
-indicator(title="Smoothed Log-Space MACD [Karl]", shorttitle="Log MACD for TOTAL Mcap", precision=3)
+indicator(title="Backtest optimized Smoothed Log-Space MACD [elindicador.ai]", shorttitle="Backtest optimized Log MACD [elindicador.ai]", precision=3)
 
 PI=3.14159265359
 
