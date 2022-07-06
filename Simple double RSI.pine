@@ -1,0 +1,105 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Karlpy
+
+//@version=5
+strategy("Simple Double RSI", overlay=true, initial_capital=100, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.05)
+
+//**************************************************************//
+//********************** CONFIG PANEL **************************//
+
+//***************************************************************//
+//************************ CONFIGURATION ************************//
+
+src = input(close, "Candle Source")
+
+use_time_window = input.bool(title='Use Time Window', defval=false, group='Backtest Time Window')
+start_date = input.int(title="Start Date", defval=1, minval=1, maxval=31, group='Backtest Time Window')
+start_month = input.int(title="Start Month", defval=1, minval=1, maxval=12, group='Backtest Time Window')
+start_year = input.int(title="Start Year", defval=2021, group='Backtest Time Window')
+end_date = input.int(title="End Date", defval=30, minval=1, maxval=31, group='Backtest Time Window')
+end_month = input.int(title="End Month", defval=9, minval=1, maxval=12, group='Backtest Time Window')
+end_year = input.int(title="End Year", defval=2021, group='Backtest Time Window')
+     
+between_dates = (time >= timestamp(start_year, start_month, start_date, 7, 0)) and (time < timestamp(end_year, end_month, end_date, 23, 59))
+
+ltf = input.timeframe(title="Select fast RSI timeframe", defval="15", group='Fast Timeframe RSI')
+len_ltf = input.int(21, minval=1, title="Fast RSI length", group='Fast Timeframe RSI')
+overbought_ltf = input.int(56, 'Overbought - fast timeframe', group='Fast Timeframe RSI', step=2)
+oversold_ltf = input.int(42, 'Oversold - fast timeframe', group='Fast Timeframe RSI', step=2)
+
+// useSlowRSI = input.bool(title='Use slow RSI', defval=false, group='Slow Timeframe RSI')
+htf = input.timeframe(title="Select slow RSI timeframe", defval="D", group='Slow Timeframe RSI')
+len_htf = input.int(21, minval=1, title="Slow RSI length", group='Slow Timeframe RSI')
+overbought_htf = input.int(54, 'Overbought - Slow timeframe', group='Slow Timeframe RSI', step=2)
+oversold_htf = input.int(40, 'Oversold - Slow timeframe', group='Slow Timeframe RSI', step=2)
+
+useSlTp = input.bool(title='Use Stop Loss & Take Profit', defval=false, group='Stop loss & take profit')
+sl_inp = input.float(5, title='Stop Loss %', group='Stop loss & take profit')/100
+tp_inp = input.float(10, title='Take Profit %', group='Stop loss & take profit')/100
+
+//**************************************************************//
+//*********************** STRATEGY CODE ************************//
+
+// Fast RSI
+rsi_ltf = request.security(syminfo.tickerid, ltf, ta.rsi(src, len_ltf))
+
+// Slow RSI
+rsi_htf = request.security(syminfo.tickerid, htf, ta.rsi(src, len_htf), lookahead=barmerge.lookahead_off)
+
+
+// BUY & SELL SIGNALS
+lowertf_is_overbought = rsi_ltf > overbought_ltf
+lowertf_is_oversold = rsi_ltf < oversold_ltf
+lowertf_crossUp = rsi_ltf[1] <  oversold_ltf and rsi_ltf > oversold_ltf
+lowertf_crossDown = rsi_ltf[1] >  overbought_ltf and rsi_ltf < overbought_ltf
+
+highertf_is_overbought = rsi_htf > overbought_htf
+highertf_is_oversold = rsi_htf < oversold_htf
+highertf_crossUp = rsi_htf[1] <  oversold_htf and rsi_htf > oversold_htf
+highertf_crossDown = rsi_htf[1] >  overbought_htf and rsi_htf < overbought_htf
+
+
+// delete later
+bgcolor(highertf_is_overbought ? color.green : na, transp=80)
+bgcolor(highertf_is_oversold ? color.red : na, transp=80)
+
+
+//Get ui logic from calculated rsi condistions
+long_condition = highertf_is_overbought and lowertf_crossUp
+short_condition = highertf_is_oversold and lowertf_crossDown
+
+    
+// Look if strategy is long
+isLong = (strategy.position_size > 0)
+// Inspect if strategy script is short
+isShort = (strategy.position_size < 0)
+
+// Define a good exit condition
+// exit = (isLong and close > open) or (isShort and close < open)
+
+// enter positions
+if use_time_window
+    if between_dates
+        strategy.entry("long", strategy.long, when=long_condition)
+        strategy.entry("short", strategy.short, when=short_condition)
+else
+    strategy.entry("long", strategy.long, when=long_condition)
+    strategy.entry("short", strategy.short, when=short_condition)
+strategy.close("long", when=lowertf_crossDown)
+strategy.close("short", when=lowertf_crossUp)
+
+long_stop_level = strategy.position_avg_price * (1 - sl_inp)
+short_stop_level = strategy.position_avg_price * (1 + sl_inp)
+
+long_profit_level = strategy.position_avg_price * (1 + tp_inp)
+short_profit_level = strategy.position_avg_price * (1 - tp_inp)
+
+if useSlTp
+    strategy.exit("long SL/TP", "long", stop=long_stop_level, limit=long_profit_level)
+    strategy.exit("short SL/TP", "short", stop=short_stop_level, limit=short_profit_level)
+
+// Plot stop loss and take profit
+plot(isShort ? na : long_stop_level, color=color.red, style=plot.style_linebr, linewidth=2)
+plot(isShort ? na : long_profit_level, color=color.green, style=plot.style_linebr, linewidth=2)
+plot(isLong ? na : short_stop_level, color=color.yellow, style=plot.style_linebr, linewidth=2)
+plot(isLong ? na : short_profit_level, color=color.blue, style=plot.style_linebr, linewidth=2)

@@ -1,0 +1,33 @@
+//RyoAsukae
+//@version=5
+
+indicator(title = "Algo-Trader", shorttitle="Algo", overlay=true)
+
+src = close
+
+//MA-crosses & trends
+l1 = 25
+l2 = 150
+l3 = 300
+
+lin1 = ta.linreg(close,l1,0)
+lin2 = ta.linreg(close,l2,0)
+lin3 = ta.linreg(close,l3,0)
+slope1 = (lin1 - lin1[l1])/l1
+slope2 = (lin2 - lin2[l2])/l2
+slope3 = (lin3 - lin3[l3])/l3
+
+above = ta.crossover(close,lin1) and slope2 > 0 and slope2 > slope3
+below = ta.crossover(lin1,close) and slope2 < 0 and slope2 < slope3
+
+trueRange = na(high[1])? high-low : math.max(math.max(high - low, math.abs(high - close[1])), math.abs(low - close[1]))
+sensitivity = input(1.0,"Sensitivity")
+atr = trueRange/sensitivity
+
+short = below and ta.atr(10) >= atr 
+long =  above and ta.atr(10) >= atr 
+
+//Plotting 
+
+plotshape(long, title = "Buy",  text = 'Buy',  style = shape.labelup,   location = location.belowbar, color= color.green, textcolor = color.white, transp = 0, size = size.tiny)
+plotshape(short, title = "Sell", text = 'Sell', style = shape.labeldown, location = location.abovebar, color= color.red,   textcolor = color.white, transp = 0, size = size.tiny)

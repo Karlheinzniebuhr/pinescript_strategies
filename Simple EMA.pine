@@ -1,0 +1,29 @@
+strategy("Simple EMA", overlay=true, initial_capital=100, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.05)
+
+start_date = input(title="Start Date", type=input.integer, defval=1, minval=1, maxval=31, group='Backtest Time Window')
+start_month = input(title="Start Month", type=input.integer, defval=1, minval=1, maxval=12, group='Backtest Time Window')
+start_year = input(title="Start Year", type=input.integer, defval=2021, group='Backtest Time Window')
+end_date = input(title="End Date", type=input.integer, defval=30, minval=1, maxval=31, group='Backtest Time Window')
+end_month = input(title="End Month", type=input.integer, defval=9, minval=1, maxval=12, group='Backtest Time Window')
+end_year = input(title="End Year", type=input.integer, defval=2021, group='Backtest Time Window')
+     
+between_dates = (time >= timestamp(start_year, start_month, start_date, 7, 0)) and (time < timestamp(end_year, end_month, end_date, 23, 59))
+
+fast_ma_period = input(title="Fast EMA", type=input.integer, defval=10)
+slow_ma_period = input(title="Slow EMA", type=input.integer, defval=40)
+
+fast_ma = ema(close, fast_ma_period)
+slow_ma = ema(close, slow_ma_period)
+
+plot(fast_ma, color=color.green, linewidth=1)
+plot(slow_ma, color=color.white, linewidth=3)
+
+buy_condition = crossover(fast_ma, slow_ma)
+sell_condition = crossunder(fast_ma, slow_ma)
+
+if between_dates
+    strategy.entry("long simple ema", strategy.long, when=buy_condition)
+    strategy.entry("short simple ema", strategy.long, when=sell_condition)
+
+strategy.close("long simple ema", when=sell_condition)
+strategy.close("short simple ema", when=buy_condition)

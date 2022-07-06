@@ -1,0 +1,21 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Karlpy
+
+
+//@version=4
+strategy("Simple EMA", overlay=true, initial_capital=100, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.05)
+
+//**************************************************************//
+//********************** CONFIG PANEL **************************//
+//**************************************************************//
+
+
+
+
+//***************************************************************//
+//************************ CONFIGURATION ************************//
+
+
+
+//**************************************************************//
+//*********************** STRATEGY CODE ************************//

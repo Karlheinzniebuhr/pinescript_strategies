@@ -1,0 +1,38 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © RyoAsukae
+ 
+//@version=5
+strategy(title = "Regression-Strat", shorttitle="Reg-Strat", overlay=true,initial_capital = 1000, default_qty_value = 100, default_qty_type = strategy.percent_of_equity)
+ 
+src = close
+l1 = 10
+l2 = 50
+ 
+lin1 = ta.linreg(close,l1,0)
+lin2 = ta.linreg(close,l2,0)
+slope1 = (lin1 - lin1[l1])/l1
+slope2 = (lin2 - lin2[l2])/l2
+
+above = ta.crossover(lin1,lin2) and slope1 < 0 and slope2 < 0 
+below = ta.crossover(lin2,lin1) and slope1 > 0 and slope2 > 0 
+
+trueRange = na(high[1])? high-low : math.max(math.max(high - low, math.abs(high - close[1])), math.abs(low - close[1]))
+sensitivity = input(1.0,"Sensitivity")
+atr = trueRange/sensitivity
+ 
+short = below and ta.atr(10) >= atr
+long =  above and ta.atr(10) >= atr
+ 
+p = input(50,"TP")
+l = input(50,"SL")
+Y = input(2021,"Year")
+M = input(1,"Month")
+D = input(1,"Day")
+ 
+date = time >= timestamp(syminfo.timezone,Y,M,D,0,0)
+ 
+strategy.entry("long",strategy.long, when = long and barstate.isconfirmed)
+strategy.exit("exit","long",loss = l,profit = p)
+ 
+strategy.entry("short",strategy.short, when = short and barstate.isconfirmed)
+strategy.exit("exit","short",loss = l,profit = p) 

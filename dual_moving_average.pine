@@ -1,0 +1,47 @@
+//written by sixpathssenin
+//@version=4
+strategy(title="Dual Moving Average",initial_capital=10000,overlay=true)
+
+ma1= sma(close,8)
+ma2= sma(close,21)
+
+angleCriteria = input(title="Angle", type=input.integer, defval=7, minval=1, maxval=13)
+
+i_lookback   = input(2,     "Angle Period", input.integer, minval = 1)
+i_atrPeriod  = input(10,    "ATR Period",   input.integer, minval = 1)
+i_angleLevel = input(6,     "Angle Level",  input.integer, minval = 1)
+i_maSource   = input(close, "MA Source",    input.source)
+
+f_angle(_src, _lookback, _atrPeriod) =>
+    rad2degree = 180 / 3.141592653589793238462643  //pi 
+    ang = rad2degree * atan((_src[0] - _src[_lookback]) / atr(_atrPeriod)/_lookback)
+    ang
+_angle = f_angle(ma2, i_lookback, i_atrPeriod)
+
+plot(ma1,color=#FF0000)
+plot(ma2,color=#00FF00)
+
+crosso=crossover(ma1,ma2) 
+crossu=crossunder(ma1,ma2)
+
+_lookback = 15
+
+f_somethingHappened(_cond, _lookback) =>
+    bool _crossed = false
+    for i = 1 to _lookback
+        if _cond[i]
+            _crossed := true
+    _crossed
+    
+longcrossed = f_somethingHappened(crosso,_lookback)
+shortcrossed = f_somethingHappened(crossu,_lookback)
+
+long = longcrossed and _angle > angleCriteria
+short = shortcrossed and _angle < -(angleCriteria)
+
+
+if(long)
+    strategy.entry("Long",strategy.long)
+if(short)
+    strategy.entry("short",strategy.short)
+    

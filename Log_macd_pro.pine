@@ -1,0 +1,100 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Telegram: ©Karlpy Twitter: @ctmarauder
+
+//@version=5
+strategy("Log MACD Strategy", overlay=true)
+
+PI=3.14159265359
+
+opentradelong = input.string(title='Long Open Trade Alert', defval='Open Long', group='Alert Settings')
+
+closelongmess = input.string(title='Long Close', defval='Long Close', group='Alert Settings')
+
+opentradeshort = input.string(title='Short Open Trade Alert', defval='Open Short', group='Alert Settings')
+
+closeshortmess = input.string(title='Short Close', defval='Short Close', group='Alert Settings')
+
+takeprofitpercent = input.float(1.9, title='take profit percent', step=0.1, group = 'TP and SL')
+stoplosspercent = input.float(1.9, title='stop loss percent', step=0.1, group = 'TP and SL')
+
+//////////////////// Strategy EMA
+
+ema50l = input.int(33, minval=1, title='EMA 50', group='Strategy EMAs')
+ema200l = input.int(51, minval=1, title='EMA 200', group='Strategy EMAs')
+
+ema50 = ta.ema(close, ema50l)
+ema200 = ta.ema(close, ema200l)
+
+EmaAbove = input.bool(true, "> EMA 50 for signal,   if false > EMA200 ", group='Strategy EMAs')
+
+emabear = ema50  < ema200 and close < ema50
+emabull = ema50 > ema200 and close > ema50
+
+if EmaAbove 
+    emabear := ema50  < ema200 and close < ema50
+    emabull := ema50 > ema200 and close > ema50
+
+else 
+    emabear := ema50  < ema200 and close < ema200
+    emabull := ema50 > ema200 and close > ema200
+
+plot(series=ema50, color=color.new(color.lime, 0), linewidth=2)
+plot(series=ema200, color=color.new(color.red, 0), linewidth=2)
+
+bgcolor(color=ta.cross(ema50, ema200) ? color.teal : na, transp=90)
+
+
+drop1st(src) =>
+    x = float(na)
+    x := na(src[1]) ? na : src
+
+EhlersSuperSmoother(src, lower) =>
+	a1 = math.exp(-PI * math.sqrt(2) / lower)
+	coeff2 = 2 * a1 * math.cos(math.sqrt(2) * PI / lower)
+	coeff3 = -math.pow(a1, 2)
+	coeff1 = (1 - coeff2 - coeff3) / 2
+	filt = float(na)
+	filt := nz(coeff1 * (src + nz(src[1], src)) + coeff2 * filt[1] + coeff3 * nz(filt[2], filt[1]), src)
+
+// Replaces built-in EMA function for better sensitivity in the beginning
+xema(src, len) =>
+    mult = 2.0 / (len + 1.0)
+    res = float(na)
+    res := nz(mult * src + (1.0 - mult) * res[1], src)
+
+// Reduce range of the output
+LogClip(xs) =>
+    xs > 0 ? math.log(1.0 + xs) : -math.log(1.0 - xs)
+
+fastLength = input.int(7, minval=1, title="Fast Length")
+slowLength = input.int(290, minval=1, title="Slow Length")
+maLength = input.int(7, minval=1, title="MA Length")
+signalSmoothing = input.int(3, minval=0, title="Signal Smoothing")
+showsignals = input(false, title="Buy/Sell Signals")
+logcompress = input(false, title="Extra Log Compression")
+src = input.source(title="Source", defval=close)
+
+price = math.log(drop1st(src))
+fastMA = xema(price, fastLength)
+slowMA = xema(price, slowLength)
+rawsig = EhlersSuperSmoother(fastMA - slowMA, signalSmoothing)
+sig = logcompress ? LogClip(rawsig) : rawsig
+ma = ta.sma(sig, maLength)
+delta = sig - ma
+
+
+islong = strategy.position_size > 0
+isshort = strategy.position_size < 0
+isnotin = strategy.position_size == 0
+
+
+if (ta.crossover(delta, 0)) and not isshort
+	strategy.entry("Buy", strategy.long, comment="Buy")
+if (ta.crossunder(delta, 0)) and not islong
+	strategy.entry("Sell", strategy.short, comment="Sell")
+
+profittarget = close * (takeprofitpercent / 100) / syminfo.mintick
+losstarget = close * (stoplosspercent / 100) / syminfo.mintick
+
+strategy.exit(id = 'Buy', from_entry = 'Buy' ,comment= 'LONG  EXIT', profit = profittarget, loss = losstarget)
+strategy.exit(id = 'Sell', from_entry = 'Sell',comment= 'Short  Exit ', profit = profittarget , loss = losstarget)
