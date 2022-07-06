@@ -1,2 +1,2 @@
 # pinescript_strategies
-A collection of good pinescript strategies
+A collection of my favorite pinescript strategies
